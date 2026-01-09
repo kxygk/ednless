@@ -68,6 +68,8 @@
 
 (require
   '[com.wsscode.pathom3.connect.operation :as pco]
+  '[com.wsscode.pathom3.connect.planner :as pcp]
+  '[com.wsscode.pathom3.interface.eql :as pie]
   '[com.wsscode.pathom3.connect.indexes :as pci]
   '[com.wsscode.pathom3.interface.smart-map :as psm])
 
@@ -127,7 +129,7 @@
 (def xy-point-maps
   "Now I remake the x-y data as labeled maps
   So the x and y are explicitely labeled"
-  (repeatedly 100000
+  (repeatedly 10000000
               #(hash-map ::x
                          (rand)
                          ::y
@@ -149,8 +151,8 @@
                                    ::angle ]}]}
   {::polar-data (mapv (fn [{::keys [radius
                                     angle]}]
-                        {:radius radius
-                         :angle  angle}) ;; maybe superfluous
+                        {::radius radius
+                         ::angle  angle}) ;; maybe superfluous
                       cartesian-data)})
 #_
 ($polar-data {::cartesian-data [{::radius 3.0
@@ -174,15 +176,31 @@
 
 ;;     {:y 0.9528055634606857, :x 0.9674033979599416})
 
+(pco/defresolver $angular-average
+  "Converts a lists of xy point maps to
+   a list of polar coordinates"
+  [{::keys [cartesian-data]}]
+  {::pco/input [{::cartesian-data [::angle]}]}
+  {::angular-average (/ (reduce (fn [sum
+                                     next-point]
+                                  (+ sum
+                                     (::angle next-point)))
+                                0.0
+                                cartesian-data)
+                        (count cartesian-data))})
+
+
 (def env (pci/register [$radius
                         $angle
                         $normalized-point
                         $polar-data
-                        $normalized-data]))
+                        $normalized-data
+                        $angular-average]))
 
 (def smap (psm/smart-map env
                          {::cartesian-data xy-point-maps}))
 
+#_
 (take 5
       (::normalized-data smap))
 ;; => (#:user{:x-norm 0.08712330380715341, :y-norm 0.9961975355991032}
@@ -191,7 +209,7 @@
 ;;     #:user{:x-norm 0.8241905340531331, :y-norm 0.5663126023471587}
 ;;     #:user{:x-norm 0.9010577036764886, :y-norm 0.4336992214026367})
 
-
+#_
 (take 5
       (::polar-data smap))
 ;; => ({:radius 0.2674784113124991, :angle 1.4835624270007897}
@@ -199,3 +217,107 @@
 ;;     {:radius 0.7074320549968458, :angle 0.7857016754029951}
 ;;     {:radius 0.9759277453181741, :angle 0.602024979576675}
 ;;     {:radius 0.28699758977324435, :angle 0.4485941613968548})
+
+
+(def env2 (pci/register [$radius
+                        $angle
+                        $normalized-point
+                        $polar-data
+                        $normalized-data
+                        $angular-average]))
+
+
+(defonce plan-cache* (atom {}))
+
+(def env3 (-> (pci/register [$radius
+                        $angle
+                        $normalized-point
+                        $polar-data
+                        $normalized-data
+                             $angular-average])
+              (pcp/with-plan-cache plan-cache*)))
+
+
+(println "`process` EQL query direct `angular average` calculation")
+
+(time 
+(/ (reduce (fn [sum
+                next-point]
+             (+ sum
+                (::angle next-point)))
+           0.0
+           (-> env2
+               (pie/process {::cartesian-data xy-point-maps}
+                            [{::cartesian-data [::angle]}])
+               ::cartesian-data))
+   (count xy-point-maps))
+)
+
+
+
+(println "Normal smart map `angular average` calculation")
+(time
+(::angular-average smap)
+)
+
+
+(println "`process` EQL query direct `angular average` calculation")
+
+(time 
+(/ (reduce (fn [sum
+                next-point]
+             (+ sum
+                (::angle next-point)))
+           0.0
+           (-> env2
+               (pie/process {::cartesian-data xy-point-maps}
+                            [{::cartesian-data [::angle]}])
+               ::cartesian-data))
+   (count xy-point-maps))
+)
+
+
+
+(println "`process` EQL query direct `angular average` calculation - with CACHE")
+
+(time 
+(/ (reduce (fn [sum
+                next-point]
+             (+ sum
+                (::angle next-point)))
+           0.0
+           (-> env3
+               (pie/process {::cartesian-data xy-point-maps}
+                            [{::cartesian-data [::angle]}])
+               ::cartesian-data))
+   (count xy-point-maps))
+)
+
+
+
+(println "Normal EQL `angular average` fetch with CACHE")
+(time
+  (-> env3
+      (pie/process  {::cartesian-data xy-point-maps}
+                    [::angular-average]))
+)
+
+
+
+
+(println "Normal EQL `angular average` fetch with NO CACHE")
+(time
+  (-> env2
+      (pie/process  {::cartesian-data xy-point-maps}
+                    [::angular-average]))
+)
+
+;; (pco/defresolver $some-fancy-plotting
+;;   [{::keys [cartesian-data
+;;             angular-average]}]
+;;   ::pco/input [{::cartesian-data [::x-norm
+;;                                   ::y-norm
+;;                                   :radius
+;;                                   :angle]}]
+;;   {::svg-hiccup (my-fancy-plotting-function cartesian-data
+;;                                             angular-average)})
