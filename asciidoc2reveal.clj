@@ -8,11 +8,17 @@
          SafeMode])
 
 (let [filestr
-      "/home/kxygk/Projects/stars/Zeeden2023.adoc"
+      "/home/kxygk/Projects/archive/ppp-fall25.adoc"
+      #_
+      "/home/kxygk/Projects/archive/trip-report-spring2025.adoc"
+      #_
+      "/home/kxygk/Projects/archive/qual.adoc"
       #_
       "/home/kxygk/Projects/stars/agu2023.adoc"
       #_
-      "/home/kxygk/Projects/stars/tga2022.adoc"
+      "/home/kxygk/Projects/archive/agu2023-short.adoc"
+      #_
+      "/home/kxygk/Projects/archive/tga2022.adoc"
       #_
       "/home/kxygk/Projects/stars/summer-plans.adoc"
       #_
@@ -26,7 +32,7 @@
       #_
       "/home/kxygk/Projects/stars/seminar3-slides.adoc"
       #_
-      "/home/kxygk/Projects/stars/bangkok-phd.adoc"
+      "/home/kxygk/Projects/archive/bangkok-phd.adoc"
       #_
       "/home/kxygk/Projects/stars/olimio180.adoc"
       #_

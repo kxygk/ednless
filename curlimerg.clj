@@ -4,6 +4,7 @@
 
 (require '[clj-curl.easy :as curl-easy])
 (require '[clj-curl.opts :as curl-opts])
+#_
 (require '[clojure.core.async :as async :refer :all])
 
 ;; = `Rain`
@@ -172,7 +173,7 @@
 
 
 ;; Now downloading all the monthly FINAL rains will look something like
-#_
+;;#_
 (let [years               (range
                             2011
                             2021) ;; range is no inclusive of the `end` term
@@ -187,7 +188,7 @@
                                            [year]
                                            (mapv (fn
                                                    [month]
-                                                   (str "/sm/730/gpmdata/"
+                                                   (str "/sm/911/gpmdata/"
                                                         year
                                                         "/"
                                                         month
@@ -202,7 +203,7 @@
                                                         month
                                                         "01-S000000-E235959."
                                                         month
-                                                        ".V06B.tif"))
+                                                        ".V07B.tif"))
                                                  months))
                                          years))]
   (dorun (map (fn [path
@@ -210,7 +211,7 @@
                 (download-rain "ftp://arthurhou.pps.eosdis.nasa.gov"
                                path
                                file
-                               "/home/geokon/Junk/earlydata/"))
+                               "/home/kxygk/Data/imerg/monthly/final-v7b/"))
               paths
               files)))
 
@@ -369,7 +370,7 @@
 ;; jsimpsonftps.pps.eosdis.nasa.gov/data/imerg/gis/2023/05/
 ;; files of the form ..
 ;; 3B-HHR-L.MS.MRG.3IMERG.20230507-S233000-E235959.1410.V07B.1day.tif
-;;#_
+#_
 (->> (let [output-dirstr "/home/kxygk/Data/imerg/daily/V06/late/"
            server        "ftp://jsimpsonftps.pps.eosdis.nasa.gov"]
        (for [year  (range
@@ -379,7 +380,7 @@
                           13)
              day   (range 1
                           32)]
-         (let [path (str "/data/imerg/gis/V06/"
+         (let [path (str "/data/imerg/gis/"
                          (format "%04d"
                                  year)
                          "/"
@@ -406,3 +407,4 @@
 (download-rain "ftp://jsimpsonftps.pps.eosdis.nasa.gov"
                "/data/imerg/gis/2021/02/" "3B-HHR-L.MS.MRG.3IMERG.20210229-S233000-E235959.1410.V07B.1day.tif"
                "/home/kxygk/Data/imerg/daily/late-more/")
+

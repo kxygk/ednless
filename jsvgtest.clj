@@ -24,9 +24,11 @@
                         .size)
         width       (-> doc-size
                         .width
+                        (* 0.5)
                         int)
         height      (-> doc-size
                         .height
+                        (* 0.5)
                         int)
         imgbuf      (BufferedImage. width
                                     height
