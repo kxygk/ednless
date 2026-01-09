@@ -1,7 +1,6 @@
 ;; Assumes GDAL is installed
 ;; `gdal_translate` and `gdalinfo` are available
 
-
 (def
   era5-precip
   "The original values seem to be floating point values
@@ -20,7 +19,8 @@
    to 0-65535
    So that the values are directly interpretable as in `nanometers`
    This should be more than enough precision.."
-  {:netcdf-filestr "/home/kxygk/Data/sst/monthly/sst.mon.mean.nc"
+  {:netcdf-dirstr "/home/kxygk/Data/sst/monthly/"
+   :netcdf-filestr "sst.mon.mean.nc"
    :output-dirstr  "/home/kxygk/Data/sst/monthly/"
    :input-min 0
    :input-max 0.065535 ;; more than the actual max
@@ -34,7 +34,8 @@
     `https://psl.noaa.gov/data/gridded/data.noaa.oisst.v2.highres.html`
   Just following the era5 conversion from before
   `gdalinfo` indicated the min max is -3 to 45 (freezing point of liquid sea water?)"
-  {:netcdf-filestr "/home/kxygk/Data/sst/monthly/sst.mon.mean.nc"
+  {:netcdf-dirstr "home/kxygk/Data/sst/monthly/"
+   :netcdf-filestr "sst.mon.mean.nc"
    :output-dirstr  "/home/kxygk/Data/sst/monthly/"
    :input-min -3 ;; from `ncview`
    :input-max 45 ;; indicated the min/max `valid-range`
@@ -42,86 +43,146 @@
    :output-max 65535
    :netcdf-var "sst"})
 
-(let [{:keys [netcdf-filestr
-              output-dirstr
-              rescaling-vals
-              input-min
-              input-max
-              output-min
-              output-max
-              netcdf-var]} sst
-      ]
-  (let [info    (->> netcdf-filestr
-                     (clojure.java.shell/sh "gdalinfo")
-                     second
-                     second)
-        by-band (clojure.string/split info
-                                      #"\nBand")
+(def
+  gpcc
+  " `gdalinfo -sd 2 precip.monitor.mon.total.1x1.v2020.nc > precip-monthly.info`
+  Reads:
+  `precip#actual_range={0,2702.3601}`
+  There is another dataset called `time_bnds` that I don't understand"
+  {:netcdf-dirstr "/home/kxygk/Data/gpcc/"
+   :netcdf-filestr "precip.monitor.mon.total.1x1.v2020.nc"
+   :output-dirstr  "/home/kxygk/Data/gpcc/monthly/"
+   :input-min      0
+   :input-max      65535 ;; more than the actual max (of 2702...)
+   :output-min     0       ;; remaps to UInt16 vals and keeps values in `mm`
+   :output-max     65535
+   :netcdf-var     "precip"})
 
-        last-block-number (-> by-band
-                              last
-                              (clojure.string/split #" ")
-                              second
-                              read-string)
-        blocks            (range 1
-                                 (inc last-block-number))]
-    (println (str "Total number of Blocks: "
-                  last-block-number))
-    (let [to-tiff (fn [block-num]
-                    (str "gdal_translate "
-                         "-ot UInt16 " ;; output unsigned 16 bit
-                         (str "-scale "
-                              input-min
-                              " "
-                              input-max
-                              " "
-                              output-min
-                              " "
-                              output-max) ;; rescale from internal max to 0-65535
-                         " -b "
-                         block-num
-                         (str " NETCDF:"
-                              netcdf-filestr
-                              ":"
-                              netcdf-var) ;; indicates temperature
-                         (str " "
-                              output-dirstr
-                              "geotiff/block-"
-                              (format "%04d"
-                                      block-num)
-                              ".tiff")))
-          rotate (fn [block-num]
-                   (str "gdalwarp"
-                        " -s_srs "
-                        "\"+proj=longlat +ellps=WGS84\""
-                        " -t_srs WGS84 "
-                        output-dirstr
-                        "geotiff/block-"
-                        (format "%04d"
-                                block-num)
-                        ".tiff"
-                        " "
-                        output-dirstr
-                        "geotiff-rot/"
-                        "block-"
-                        (format "%04d"
-                                block-num)
-                        "-rot"
-                        ".tiff"
-                        "  -wo SOURCE_EXTRA=1000"
-                        " --config CENTER_LONG 0"))]
-      (println (str "Example to-geotiff converter:\n"
-                    (to-tiff 1)))
-      (println (str "Example rotation converter:\n"
-                    (rotate 1)))
-      (->> blocks
-           (run! (fn [block-number]
-                   (clojure.java.shell/sh "/bin/bash"
-                                          "-c"
-                                          (to-tiff block-number)))))
-      (->> blocks
-           (run! (fn [block-number]
-                   (clojure.java.shell/sh "/bin/bash"
-                                          "-c"
-                                          (rotate block-number))))))))
+(defn
+  to-tiff
+  [netcdf-config]
+  (let [{:keys [netcdf-dirstr
+                netcdf-filestr
+                output-dirstr
+                rescaling-vals
+                input-min
+                input-max
+                output-min
+                output-max
+                netcdf-var]} netcdf-config
+        ]
+    (let [info              (->> netcdf-filestr
+                                 (str netcdf-dirstr)
+                                 (clojure.java.shell/sh "gdalinfo" "-sd" "1")
+                                 second
+                                 second)
+          by-band           (clojure.string/split info
+                                                  #"\nBand")
+          last-block-number (-> by-band
+                                last
+                                (clojure.string/split #" ")
+                                second
+                                read-string)
+          blocks            (range 1
+                                   (inc last-block-number))]
+      (println (str "Total number of Blocks: "
+                    last-block-number))
+      (let [to-tiff (fn [block-num]
+                      (str "gdal_translate "
+                           "-ot UInt16 " ;; output unsigned 16 bit
+                           (str "-scale "
+                                input-min
+                                " "
+                                input-max
+                                " "
+                                output-min
+                                " "
+                                output-max) ;; rescale from internal max to 0-65535
+                           " -b "
+                           block-num
+                           (str " NETCDF:"
+                                (str netcdf-dirstr
+                                     netcdf-filestr)
+                                ":"
+                                netcdf-var) ;; indicates temperature
+                           (str " "
+                                output-dirstr
+                                "geotiff/"
+                                netcdf-filestr
+                                "-block"
+                                (format "%04d"
+                                        block-num)
+                                ".tiff")))
+            rotate  (fn [block-num]
+                      (str "gdalwarp"
+                           " -s_srs "
+                           "\"+proj=longlat +ellps=WGS84\""
+                           " -t_srs WGS84 "
+                           output-dirstr
+                           "geotiff/"
+                           netcdf-filestr
+                           "-block"
+                           (format "%04d"
+                                   block-num)
+                           ".tiff"
+                           " "
+                           output-dirstr
+                           "geotiff-rot/"
+                           netcdf-filestr
+                           "-block"
+                           (format "%04d"
+                                   block-num)
+                           "-rot"
+                           ".tiff"
+                           "  -wo SOURCE_EXTRA=1000"
+                           " --config CENTER_LONG 0"))]
+        (println (str "Example to-geotiff converter:\n"
+                      (to-tiff 1)))
+        (println (str "Example rotation converter:\n"
+                      (rotate 1)))
+        ;;#_
+        (->> blocks
+             (run! (fn [block-number]
+                     (clojure.java.shell/sh "/bin/bash"
+                                            "-c"
+                                            (to-tiff block-number)))))
+        (->> blocks
+             (run! (fn [block-number]
+                     (clojure.java.shell/sh "/bin/bash"
+                                            "-c"
+                                            (rotate block-number)))))))))
 ;; => "gdalwarp -s_srs \"+proj=longlat +ellps=WGS84\" -t_srs WGS84 /home/kxygk/Data/era5/monthly/era5-geotiff-block-0001 /home/kxygk/Data/era5/monthly//rot/era5-geotiff-block-0001  -wo SOURCE_EXTRA=1000 --config CENTER_LONG 0"
+
+
+;; This one is different b/c split along several files..
+
+(def
+  gpcp ;;GPCPDAY_L3_20201231_V3.2.nc4
+  {:netcdf-dirstr "/home/kxygk/Data/gpcp/daily-netcdf/"
+   :netcdf-filestr "GPCPDAY_L3_20201231_V3.2.nc4"
+   :output-dirstr  "/home/kxygk/Data/gpcp/daily/"
+   :input-min      0
+   :input-max      500 ;; more than the actual max (of 2702...)
+   :output-min     0       ;; remaps to UInt16 vals and keeps values in `mm`
+   :output-max     65535
+   :netcdf-var     "precip"})
+
+
+(defn
+  batch-to-tiff
+  "Converts a whole directory of netcdf files to tiff"
+  [netcdf-config
+   directorystr]
+  (let [filenames  (-> directorystr
+                       java.io.File.
+                       .list
+                       sort)]
+    (->> filenames
+         (mapv #(to-tiff (assoc (assoc netcdf-config
+                                       :netcdf-filestr
+                                       %)
+                                :directorystr
+                                directorystr))))))
+
+(batch-to-tiff gpcp
+               "/home/kxygk/Data/gpcp/daily-netcdf/")
