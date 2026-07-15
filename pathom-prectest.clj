@@ -183,6 +183,7 @@
 
 ;; ;;;;;;
 ;; Branch selection key on input
+;; RESULT: Key forces the branch
 
 (pco/defresolver XXX
   [{::keys [a-2-b
@@ -208,7 +209,8 @@
 ;; #:user{:result 666.0}
 
 ;; ;;;;;;
-;; Branch selection key on output - DOESN'T WORK
+;; Branch selection key on output
+;; RESULT: Key actually doesn't matter.. new branch always clobbers the old
 
 (pco/defresolver YYY
   [{::keys [a-2-b]}]
